@@ -3,12 +3,12 @@
 summer.api
 ~~~~~~~~~~
 
-This module implements the Reads API and OPERATES API.
+This module implements the Reads API and Operates API.
 
 :author: Andy Yang.
 """
 
-from core import File, FileCollection
+from summer.core import File, FileCollection
 
 def file(method:str, name: str, filepath: str, columns: list) -> "File":
     r"""Constructs a :class:`File <File>`.
