@@ -20,7 +20,7 @@ import summer
 
 Usage
 -----
-The summer library enables you to quickly complete daily reports.
+The summer library enables you to quickly completes daily reports.
 
 ```python
 import summer
