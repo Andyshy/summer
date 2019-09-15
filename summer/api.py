@@ -21,7 +21,7 @@ def file(method:str, name: str, filepath: str, columns: list) -> "File":
     Usage:
       >>> import summer
       >>> f = summer.file("read_excel", "sheetname", "C:\example.xlsx", ["columnname"])
-      <File read_excel>
+      <File method=read_excel name=sheetname>
     """
 
     return File(method=method, name=name, filepath=filepath, columns=columns)
@@ -50,14 +50,14 @@ def read_csv(name: str, filepath: str, columns: list):
 
     return file("read_csv", name=name, filepath=filepath, columns=columns)
 
-def files(core_file: str) -> "FileCollection":
+def create_files(core_file: str) -> "FileCollection":
     r"""Constructs a :class:`FileCollection <FileCollection>`.
     
     :param core_file: core_file for the new :class:`FileCollection` object.
 
     Usage:
       >>> import summer
-      >>> fs = summer.files("C:\corefile.xlsx")
+      >>> fs = summer.create_files("C:\corefile.xlsx")
       <FileCollection size=0 core_file=C:\corefile.xlsx>
     """
     

@@ -8,6 +8,8 @@ This module provides some utility methods.
 import chardet
 import os
 
+import fnmatch
+
 def filename_match(name: str, file_path: str, file_names: list) -> str:
     """Return a full file path.
 
@@ -15,11 +17,12 @@ def filename_match(name: str, file_path: str, file_names: list) -> str:
     :return:
     """
     for file_name in file_names:
-        if name not in file_name:
+        if not fnmatch.fnmatch(file_name, "{}*".format(name)):
             continue
         full_file_path = os.path.join(file_path, file_name)
-        break
-    return full_file_path
+        return full_file_path
+    return ""
+    
 
 def chardet_file(full_file_path: str) -> str:
     """Return a file's encoding.

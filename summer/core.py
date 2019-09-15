@@ -7,7 +7,6 @@ This module provides a File to keep data from a file or query, provides a
 FileCollection to manage and process all file and provides a XlExceler to operates excel.
 """
 import os
-import logging
 
 import pandas as pd
 import xlwings as xl
@@ -38,9 +37,19 @@ class DataFrameWrapper:
 
 class File:
     """A file, from a read, from a database."""
-    __slots__ = ["_method", "_name", "_filepath", "_columns", "_contents"]
+    __slots__ = ["_method", "_name", "_filepath", "_columns", "_contents", "_is_col_used", "_is_content"]
 
     def __init__(self, method: str, name: str, filepath: str, columns: list):
+        if not isinstance(method, str):
+            raise ValueError("Enter a string read method, such as 'read_excel/read_csv' "
+                             "instead of {} {}".format(type(method.__name__), method)
+            )
+        if not isinstance(name, str):
+            raise ValueError("Enter a string sheetname, instead of {} {}".format(type(method.__name__), name)
+            )
+        if not isinstance(filepath, str):
+            raise ValueError("Enter a string filepath, instead of {} {}".format(type(method.__name__), filepath)
+            )
         # read mthod
         self._method = method
         # sheetname
@@ -49,12 +58,17 @@ class File:
         self._filepath = filepath
         # required fields
         self._columns = columns
+        
+        self._is_col_used = False
+        self._is_content = False
         # file's contents
         self._contents = self._read()
+        
     
     def __repr__(self):
-        return "<File %s>" % self.method()
+        return "<File method={} name={}>".format(self.method(), self.name())
     
+    @property
     def method(self) -> str:
         """File.method() -> str
 
@@ -63,6 +77,7 @@ class File:
         """
         return self._method
     
+    @property
     def name(self) -> str:
         """File.name() -> str
 
@@ -71,6 +86,7 @@ class File:
         """
         return self._name
     
+    @property
     def filepath(self) -> str:
         """File().filepath() -> str
 
@@ -79,6 +95,7 @@ class File:
         """
         return self._filepath
     
+    @property
     def columns(self) -> list:
         """File().columns() -> list
 
@@ -87,6 +104,10 @@ class File:
         """
         return self._columns
     
+    @property
+    def is_content(self) -> bool:
+        return self._is_content
+    
     def _scanning(self) -> list:
         """Scanning a file directory, and return a list of some file name.
 
@@ -94,9 +115,9 @@ class File:
         :return list:
         :rtype: list
         """
-        if not os.path.exists(self.filepath()):
+        if not os.path.exists(self.filepath):
             raise errors.FilePathError()
-        file_names = os.listdir(self.filepath())
+        file_names = os.listdir(self.filepath)
         return file_names
         
     
@@ -108,16 +129,20 @@ class File:
         :rtype: pd.DataFrame
         """
         file_names = self._scanning()
-        full_file_path = utils.filename_match(name=self.name(), 
-                                              file_path=self.filepath(), 
+        full_file_path = utils.filename_match(name=self.name, 
+                                              file_path=self.filepath, 
                                               file_names=file_names)
-        if self.method() == "read_excel":
+        if not full_file_path:
+            return ""
+        # 读取到内容为True
+        self._is_content = True
+        if self.method == "read_excel":
             return pd.read_excel(full_file_path)
-        if self.method() == "read_csv":
+        elif self.method == "read_csv":
             encoding = utils.chardet_file(full_file_path)
             return pd.read_csv(full_file_path, encoding=encoding)
     
-
+    @property
     def contents(self) -> 'DataFrameWrapper':
         """Return a :class:`DataFrameWrapper` object.
 
@@ -128,7 +153,7 @@ class File:
         dataframewrapper = DataFrameWrapper(self._contents)
         return dataframewrapper()
     
-    def clean(self, column_src: str, column_dst: str, clean_func: 'function'):
+    def clean(self, column_src: str=None, column_dst: str=None, clean_func: 'function'=None):
         """Add new filed and processing file's contens
 
         :param column_src: old field.
@@ -136,29 +161,33 @@ class File:
         :param clean_func: data cleaning func.
         :return:
         """
-        if not isinstance(self.columns(), list):
-            raise errors.FileColumnsError()
-        self._contents = self._contents[self.columns()]
-        self._contents[column_dst] = self._contents[column_src].apply(clean_func)
-        self._contents= self._contents.loc[self._contents[column_dst] != ""]
+        if self._is_content:
+            if not isinstance(self.columns, list):
+                raise errors.FileColumnsError()
+            # fix clean a col
+            if not self._is_col_used:
+                self._contents = self._contents[self.columns]
+                self._is_col_used = True
+            if (column_src and column_dst and clean_func):
+                self._contents[column_dst] = self._contents[column_src].apply(clean_func)
+                self._contents= self._contents.loc[self._contents[column_dst] != ""]
 
         
-
-
 class FileCollection:
     """A set of Files from many register"""
 
     def __init__(self, core_file: str):
         self._core_file = core_file
         self._files = {}
-        self._excel_init()
+        self._init_excel()
     
     def __repr__(self):
         return "<FileCollection size={} core_file={}>".format(len(self), self._core_file)
 
     def __len__(self):
         return len(self._files)
-
+    
+    @property
     def files(self):
         """Files.files() -> dict.
         
@@ -173,16 +202,16 @@ class FileCollection:
         :param file: File to operates in the body of Files.
         :return:
         """
-        if file.name() not in self._files:
-            self._files[file.name()] = file
+        if file.is_content and file.name not in self._files:
+            self._files[file.name] = file
     
-    def _excel_init(self):
+    def _init_excel(self):
         """Excel operation initialization.
 
         :params:
         :return:
         """
-        self.excel = XlExceler()
+        self.excel = init_excel()
 
     
     def process_file(self):
@@ -225,8 +254,7 @@ class XlExceler(BaseExceler):
             range_down_num = range_down_num + 1
         else:
             range_down_num = 2
-        sheet.range("J1").value = "1"
-        sheet.range("A{}".format(range_down_num)).options(index=False, header=False).value = data.contents()
+        sheet.range("A{}".format(range_down_num)).options(index=False, header=False).value = data.contents
 
     def close(self):
         """Quit excel application.
@@ -239,6 +267,16 @@ class XlExceler(BaseExceler):
         self.app.display_alerts = True
         self.app.screen_updating = True
         self.app.quit()
+
+
+def init_excel():
+    """Excel operation initialization.
+
+    :params:
+    :return:
+    """
+    return XlExceler()
+
 
 if __name__ == "__main__":
     pass
